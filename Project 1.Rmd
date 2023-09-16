@@ -1,0 +1,403 @@
+---
+title: "Project 1"
+author: "Natalia Sifnugel"
+date: "2023-09-16"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, include=FALSE}
+library(tidyverse)
+library(tidytuesdayR)
+library(here)
+library(gapminder)
+library("magrittr")
+library("paletteer") 
+library(ggthemes)
+library(bbplot)
+library(sessioninfo)
+
+if (!dir.exists(here("data"))) {
+  dir.create(here("data"))
+}
+
+if (!file.exists(here("data", "chocolate.RDS"))) {
+  url_csv <- "https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2022/2022-01-18/chocolate.csv"
+  chocolate <- read_csv(url_csv)
+  saveRDS(chocolate, file = here("data", "chocolate.RDS")) 
+}
+
+chocolate <- readRDS(here("data", "chocolate.RDS"))
+as_tibble(chocolate)
+
+glimpse(chocolate)
+```
+
+# Part 1: Explore data
+
+#### 1. Histogram of ratings 
+```{r warning=FALSE}
+qplot(rating, data = chocolate, bins = 25) 
+```
+
+Adjusting the bin size impacts how the data are grouped. Increasing the bin size aggregated the data in smaller groups. Since fewer data points contribute to each group/bin, each individual point is better represented, resulting in a more detailed histogram. I chose the bins=25 because  I think it looks the best visually. The bars in the histogram are evenly spread and the central tendency of the distribution is clear. 
+
+#### 2. Reviews per country
+
+```{r}
+
+chocolate %>%
+  group_by(country_of_bean_origin) %>%
+  summarize(tibble(
+    `number_of_ratings` = length(rating))) %>%
+    unique() %>%
+    arrange(desc(number_of_ratings)) %>%
+  print(n=Inf)
+
+```
+
+#### 3. Ecuador summary
+
+```{r}
+
+summary_ecuador <- chocolate %>%
+  filter(country_of_bean_origin == "Ecuador") %>%
+  summarize(tibble(
+    `mean` = mean(rating),
+    `sd` = sd(rating),
+    `total` = length(rating)
+  ))
+
+print(summary_ecuador)
+
+```
+
+#### 4. Company making the best chocolate with Ecuadorian beans
+
+```{r}
+
+chocolate %>%
+  filter(country_of_bean_origin == "Ecuador") %>%
+  group_by(company_manufacturer) %>%
+  summarize(
+    average_rating = mean(rating)
+  ) %>%
+  arrange(desc(average_rating))
+
+```
+
+Based on the average rating, five companies are tied for the highest rated chocolate using Ecuadorian beans. These companies are Amano, Benoit Nihant, Beschle (Felchlin), Durci, and Smooth Chocolator. 
+
+#### 5. Countries with highest rated beans
+
+```{r}
+chocolate %>%
+  group_by(country_of_bean_origin) %>%
+  summarize(
+    average_rating = mean(rating)) %>%
+  arrange(desc(average_rating))
+```
+
+The three countries with the highest rated beans are Tobago, China, and Sao Tome & Principe.
+
+#### 6. Countries with highest rated beans if the number of reviews is greater than 10 
+
+```{r}
+
+chocolate %>%
+  group_by(country_of_bean_origin) %>%
+  mutate(number_of_ratings = length(rating)) %>%
+  filter(number_of_ratings >= 10) %>%
+  summarize(
+    average_rating = mean(rating)) %>%
+  arrange(desc(average_rating))
+
+```
+
+Removing countries who received less than 10 reviews changes the top three highest rated countries. The top three highest rated countries of bean origin based on this stratification are Solomon Islands, Congo, and Cuba. 
+
+#### 7. Relationship between percent chocolate and ratings
+
+```{r fig.height=30, fig.width=7}
+chocolate_reviews_50 <- chocolate %>%
+  group_by(country_of_bean_origin) %>%
+  mutate(number_of_ratings = length(rating)) %>%
+  filter(number_of_ratings >= 50) %>%
+  mutate(cocoa_percent_integer = as.integer(substr(cocoa_percent,1,1))) %>%
+  mutate(cocoa_percent_group = case_when(
+    cocoa_percent_integer > 2 & cocoa_percent_integer < 6 ~ "<60%",
+    cocoa_percent_integer == 6 ~ ">=60% to <70%",
+    cocoa_percent_integer == 7 | cocoa_percent_integer == 8 ~ ">=70% to <90%",
+    cocoa_percent_integer == 1 | cocoa_percent_integer == 9 ~ ">=90%"
+  )) %>%
+  arrange(cocoa_percent_group)
+
+ggplot(data = chocolate_reviews_50) +
+  geom_boxplot(aes( x = cocoa_percent_group, y = rating)) +
+  facet_grid(country_of_bean_origin ~ .) +
+  labs(title = "Rating vs. Cocoa Percentage by Country",
+    x = "Percent Cocoa",
+    y = "Rating")
+  
+```
+
+Looking at the mean values, the 60% to 70% and 70% to 90% cocoa groups are highest rated across countries of bean origin. Both within and across countries there are some striking differences. High cocoa percentage chocolate (>= 90%) made from Venezuelan and Ecuadorian beans are much less favored compared to the lower cocoa percentage groups. The distribution of the Ecuadorian >= 90% cocoa data is fairly large, suggesting there are a lot of varying opinions about the quality and taste of chocolate made from these beans. Beans from Mexico, Nicaragua, Guatemala, and Madagascar only produced chocolate in the 60% to 70% and 70% to 90% cocoa groups. The means of both groups are comparable for each country, except for Nicaraguan beans where there is a clear preference for the 70% to 90% cocoa chocolate. 
+
+# Part 2: Join two datasets together
+
+#### Adding continent to chocolate dataset 
+``` {r}
+
+gapminder_country_continent <- gapminder %>%
+    rename(country_of_bean_origin = country) %>%
+    select(country_of_bean_origin,continent) %>%
+    unique()
+
+chocolate <- left_join(x = chocolate, y = gapminder_country_continent, by = "country_of_bean_origin")
+
+```
+
+#### Creating new dataset, filtering out "Blend" country of origin and countries with less than 10 reviews
+
+``` {r}
+
+chocolate_noblend_10reviews <- chocolate %>%
+  group_by(country_of_bean_origin) %>%
+  filter(country_of_bean_origin != "Blend") %>%
+  mutate(number_of_ratings = length(rating)) %>%
+  filter(number_of_ratings >= 10)
+
+```
+
+#### Looking for NAs in continent column and creating a complete country/continent dataset
+
+```{r}
+
+complete_continent_list <- chocolate_noblend_10reviews %>%
+  select(country_of_bean_origin, continent) %>%
+  filter(is.na(continent)) %>%
+  unique() %>%
+  select(country_of_bean_origin) %>%
+  add_column(continent = c("Oceania", "Oceania", "Africa", "Oceania", "Americas", "Americas", "Americas","Africa", "Oceania","Americas","Americas" )) %>%
+  rbind(gapminder_country_continent)
+
+```
+
+#### Updating NAs in filtered chocolate data set
+
+```{r}
+chocolate_noblend_10reviews <- chocolate_noblend_10reviews %>%
+  select(-(continent))
+
+chocolate_noblend_10reviews <- left_join(x = chocolate_noblend_10reviews, y = complete_continent_list, by = "country_of_bean_origin")
+
+```
+
+#### Violin plots comparing ratings by continent 
+
+```{r}
+ggplot(chocolate_noblend_10reviews, aes(x=continent, y=rating, fill = continent))+
+  geom_violin() +
+  labs(title = "Rating by Continent",
+    x = "Continent",
+    y = "Rating")
+```
+
+# Part 3: Convert wide data into long data
+
+#### Creating columns for specific ingredients and memorable characteristcs, grouping by review year, and calculating column means
+
+```{r}
+
+chocolate_ingredients_flavors <- chocolate %>%
+  select(ref,review_date,ingredients,most_memorable_characteristics)%>%
+  mutate(beans = case_when(
+    grepl("B",ingredients) == TRUE ~ 1,
+    grepl("B",ingredients) == FALSE ~ 0
+  )) %>%
+  mutate(sugar = case_when(
+    grepl("S",ingredients) == TRUE ~ 1,
+    grepl("S",ingredients) == FALSE ~ 0
+  )) %>%
+  mutate(cocoa_butter = case_when(
+    grepl("C",ingredients) == TRUE ~ 1,
+    grepl("C",ingredients) == FALSE ~ 0
+  ))%>%
+  mutate(vanilla = case_when(
+    grepl("V",ingredients) == TRUE ~ 1,
+    grepl("V",ingredients) == FALSE ~ 0
+  ))%>%
+  mutate(lectin = case_when(
+    grepl("L",ingredients) == TRUE ~ 1,
+    grepl("L",ingredients) == FALSE ~ 0
+  )) %>%
+  mutate(salt = case_when(
+    grepl("Sa",ingredients) == TRUE ~ 1,
+    grepl("Sa",ingredients) == FALSE ~ 0
+  )) %>%
+  mutate(char_cocoa = case_when(
+    grepl("cocoa",most_memorable_characteristics) == TRUE ~ 1,
+    grepl("cocoa",most_memorable_characteristics) == FALSE ~ 0
+  ))  %>%
+  mutate(char_sweet = case_when(
+    grepl("sweet",most_memorable_characteristics) == TRUE ~ 1,
+    grepl("sweet",most_memorable_characteristics) == FALSE ~ 0
+  ))  %>%
+  mutate(char_nutty = case_when(
+    grepl("nutty",most_memorable_characteristics) == TRUE ~ 1,
+    grepl("nutty",most_memorable_characteristics) == FALSE ~ 0
+  )) %>%
+  mutate(char_creamy = case_when(
+    grepl("creamy",most_memorable_characteristics) == TRUE ~ 1,
+    grepl("creamy",most_memorable_characteristics) == FALSE ~ 0
+  ))%>%
+  mutate(char_roasty = case_when(
+    grepl("roasty",most_memorable_characteristics) == TRUE ~ 1,
+    grepl("roasty",most_memorable_characteristics) == FALSE ~ 0
+  )) %>%
+  mutate(char_earthy = case_when(
+    grepl("earthy",most_memorable_characteristics) == TRUE ~ 1,
+    grepl("earthy",most_memorable_characteristics) == FALSE ~ 0
+  ))  %>%
+    group_by(review_date) %>%
+    summarize(beans = mean(beans),
+              sugar = mean(sugar),
+              cocoa_butter = mean(cocoa_butter),
+              vanilla = mean(vanilla),
+              lectin = mean(lectin),
+              salt = mean(salt),
+              char_cocoa = mean(char_cocoa),
+              char_sweet = mean(char_sweet),
+              char_nutty = mean(char_nutty),
+              char_creamy = mean(char_creamy),
+              char_roasty = mean(char_roasty),
+              char_earthy = mean(char_earthy)
+              )  
+```
+
+#### Making ingredient and characteristc data tidy 
+
+``` {r}
+chocolate_ingredients_flavors_tidy <- chocolate_ingredients_flavors %>% 
+  pivot_longer(-review_date, names_to = "feature", values_to = "mean_score") %>%
+  mutate(review_date = factor(review_date), feature = factor(feature)) 
+print(chocolate_ingredients_flavors_tidy)
+
+```
+
+# Part 4: Data visualization
+
+#### Creating scatter plot of mean score chocolate ingredient and characteristic tidy data
+
+```{r fig.height=7, fig.width=12}
+
+chocolate_ingredients_flavors_tidy %>%
+  ggplot(aes((as.numeric(review_date)+2005), mean_score,color = feature)) +
+  geom_point(
+    size = 1, 
+  ) +
+  geom_smooth(
+    se = FALSE,
+    linewidth = 0.5,
+    method = "lm"
+  ) +
+  labs(title = "Prevalence of Chocolate Features vs. Year",
+       subtitle = "Decreases in cocoa butter, lectin, and vanillia in chocolate since 2006.",
+    x = "Year",
+    y = "Average Prevalence",
+    caption = "Natalia Sifnugel")+
+  scale_x_continuous(n.breaks=16) +
+  theme_minimal() +
+  scale_color_manual(values = paletteer_d("ggprism::colors", 13))
+
+```
+
+# Part 5: The worst plot 
+
+```{r}
+
+chocolate_ingredients_flavors_tidy %>%
+  ggplot(aes((as.numeric(review_date)+2005), mean_score,color = feature)) +
+  geom_smooth(
+    linetype = 3,
+    se = TRUE,
+    linewidth = 0.5,
+    method = "loess"
+  ) +
+  scale_x_continuous(n.breaks=4) +
+  scale_y_continuous(n.breaks=4) +
+  theme_dark() +
+  theme(legend.position = c(0.85, 0.5)) +
+  labs(caption = "Trends in chocolate ingredients and characteristics over time")
+
+```
+
+#### Customizations
+
+- **Data point color palette**: For this figure, I highlighted each feature by color, but I did not specify the color palette. The default ggplot colors are somewhat neon which obscures the data. The automatic settings also generate a gradient for the different features. Because there are so many features, the difference in color is weak, which makes it difficult to distinguish between features on the graph. 
+
+- **Use of Dark theme**: Ggplot offers many different themes. I elected to use the dark one for this part of the project because it requires data points are correctly colored to create enough contrast for strong visualization. In this graph, the data points do not have enough contrast for clear visibility. 
+
+- **Inclusion of SE**: Many of the data points are overlapping. Including the SE in this graph covers data in the overlapping regions, contributing to the poor representation. 
+
+- **Size and type of line**: I used a small line size (0.5), which I thought would be better because there are many overlapping data points. However, the size also contributes to the poor visualization created by the color palette and dark theme. I also used line type 3 which consists of points rather than a continuous line . This can be confusing for the reader because at first glance, they might consider this a dot plot. 
+
+- **Axis elements**: I did not rename the axes in this graph, making it difficult to understand what the data represent and derive any meaning. I also adjusted the breaks on the axes such that there are few tick marks which leads to more estimation when determining the values of the data points. 
+
+- **Legend Position**: I wanted practice changing the position of the legend, so I moved it into the graph. This positioning covers the data points from 2017 and on. 
+
+- **Misuse of Caption**: In the caption, I included some information about the graph, but it does not stand out, meaning viewers are likely to skip over it and struggle to understand what is being depicted. 
+
+# Part 6: The best plot
+
+```{r fig.height=10, fig.width=14}
+chocolate %>%
+  ggplot(aes(
+    x = as.factor(review_date),
+    y = rating,
+    fill = factor(review_date))) +
+  geom_violin() +
+  labs(title = "Distribution of chocolate rating data is decreasing with time.
+  Is chocolate constistently better tasting nowadays?",
+       subtitle = "Average Chocolate Rating vs. Year",
+       x = "Year",
+       y = "Average Rating",
+      caption = "Source: http://flavorsofcacao.com/chocolate_database.html") +
+  bbplot::bbc_style() +
+  theme(legend.position = "none",
+          axis.title.x = element_text(size = 20),
+          axis.title.y = element_text(size = 20),
+          plot.title = element_text(hjust = 0.5),
+          plot.subtitle = element_text(hjust = 0.5),
+          plot.caption = element_text(size = 14)) +
+  scale_fill_manual(values = paletteer_d("unikn::pal_unikn_pair")) 
+
+```
+
+#### Customizations
+
+- **Added new theme**: To improve the display of the data, I used bbc_style theme from the bbplot package. This theme bolds the titles and creates a clean background so the data can shrine through. 
+
+- **Changed color **: To add more color and better distinguish between years, I added a new color palette from the paletteer package.   
+
+- **Removed Legend**: Since the color of the data did not signify stratification by a third variable, I removed the legend. I believe this takes out some busyness from the graph, making it more appealing.  
+
+- **Labeled axes**: I change the labels of the axes from "rating" to "Average Rating" and "as.factor(review_date)" to "Year". These changes make the data more understandable and easier to draw conclusions from. 
+
+- **Created title and subtitle**: I created a title highlighting something I think we can take away from the data -- that the distribution of rating data has been decreasing since 2006. This suggests there is greater consensus on chocolate quality and taste as more people are rating chocolate similarly. The subtitle is a more formal title of the graph, describing the variables. 
+
+- **Positioning of title and subtitle**: The default positioning for the title and subtitle by the bbc_style theme was on the left hand side. I shifted these elements over to the center because I think it looks more visually appealing. The graph has a large width, so having this information to one side felt imbalanced. 
+
+- **Added caption**: I included a caption to share the source of the data. I think this is one of the most important things added to this plot because it gives credibility and allows anyone to look at the data themselves if they have doubts. 
+
+# R Session Information 
+
+```{r}
+
+options(width = 120)
+sessioninfo::session_info()
+
+```
