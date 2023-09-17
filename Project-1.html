@@ -357,6 +357,58 @@ display: none;
 </div>
 
 
+<pre class="r"><code>library(tidyverse)
+library(tidytuesdayR)
+library(here)
+library(gapminder)
+library(&quot;magrittr&quot;)
+library(&quot;paletteer&quot;) 
+library(ggthemes)
+library(bbplot)
+library(sessioninfo)
+
+if (!dir.exists(here(&quot;data&quot;))) {
+  dir.create(here(&quot;data&quot;))
+}
+
+if (!file.exists(here(&quot;data&quot;, &quot;chocolate.RDS&quot;))) {
+  url_csv &lt;- &quot;https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2022/2022-01-18/chocolate.csv&quot;
+  chocolate &lt;- read_csv(url_csv)
+  saveRDS(chocolate, file = here(&quot;data&quot;, &quot;chocolate.RDS&quot;)) 
+}
+
+chocolate &lt;- readRDS(here(&quot;data&quot;, &quot;chocolate.RDS&quot;))
+as_tibble(chocolate)</code></pre>
+<pre><code>## # A tibble: 2,530 × 10
+##      ref company_manufacturer company_location review_date
+##    &lt;dbl&gt; &lt;chr&gt;                &lt;chr&gt;                  &lt;dbl&gt;
+##  1  2454 5150                 U.S.A.                  2019
+##  2  2458 5150                 U.S.A.                  2019
+##  3  2454 5150                 U.S.A.                  2019
+##  4  2542 5150                 U.S.A.                  2021
+##  5  2546 5150                 U.S.A.                  2021
+##  6  2546 5150                 U.S.A.                  2021
+##  7  2542 5150                 U.S.A.                  2021
+##  8   797 A. Morin             France                  2012
+##  9   797 A. Morin             France                  2012
+## 10  1011 A. Morin             France                  2013
+## # ℹ 2,520 more rows
+## # ℹ 6 more variables: country_of_bean_origin &lt;chr&gt;,
+## #   specific_bean_origin_or_bar_name &lt;chr&gt;, cocoa_percent &lt;chr&gt;,
+## #   ingredients &lt;chr&gt;, most_memorable_characteristics &lt;chr&gt;, rating &lt;dbl&gt;</code></pre>
+<pre class="r"><code>glimpse(chocolate)</code></pre>
+<pre><code>## Rows: 2,530
+## Columns: 10
+## $ ref                              &lt;dbl&gt; 2454, 2458, 2454, 2542, 2546, 2546, 2…
+## $ company_manufacturer             &lt;chr&gt; &quot;5150&quot;, &quot;5150&quot;, &quot;5150&quot;, &quot;5150&quot;, &quot;5150…
+## $ company_location                 &lt;chr&gt; &quot;U.S.A.&quot;, &quot;U.S.A.&quot;, &quot;U.S.A.&quot;, &quot;U.S.A.…
+## $ review_date                      &lt;dbl&gt; 2019, 2019, 2019, 2021, 2021, 2021, 2…
+## $ country_of_bean_origin           &lt;chr&gt; &quot;Tanzania&quot;, &quot;Dominican Republic&quot;, &quot;Ma…
+## $ specific_bean_origin_or_bar_name &lt;chr&gt; &quot;Kokoa Kamili, batch 1&quot;, &quot;Zorzal, bat…
+## $ cocoa_percent                    &lt;chr&gt; &quot;76%&quot;, &quot;76%&quot;, &quot;76%&quot;, &quot;68%&quot;, &quot;72%&quot;, &quot;8…
+## $ ingredients                      &lt;chr&gt; &quot;3- B,S,C&quot;, &quot;3- B,S,C&quot;, &quot;3- B,S,C&quot;, &quot;…
+## $ most_memorable_characteristics   &lt;chr&gt; &quot;rich cocoa, fatty, bready&quot;, &quot;cocoa, …
+## $ rating                           &lt;dbl&gt; 3.25, 3.50, 3.75, 3.00, 3.00, 3.25, 3…</code></pre>
 <div id="part-1-explore-data" class="section level1">
 <h1>Part 1: Explore data</h1>
 <div id="histogram-of-ratings" class="section level4">
@@ -876,7 +928,7 @@ sessioninfo::session_info()</code></pre>
 ##  collate  en_US.UTF-8
 ##  ctype    en_US.UTF-8
 ##  tz       America/New_York
-##  date     2023-09-16
+##  date     2023-09-17
 ##  pandoc   3.1.1 @ /Applications/RStudio.app/Contents/Resources/app/quarto/bin/tools/ (via rmarkdown)
 ## 
 ## ─ Packages ───────────────────────────────────────────────────────────────────────────────────────────────────────────

@@ -9,7 +9,7 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-```{r, include=FALSE}
+```{r message=FALSE, warning=FALSE}
 library(tidyverse)
 library(tidytuesdayR)
 library(here)
