@@ -121,7 +121,7 @@ Removing countries who received less than 10 reviews changes the top three highe
 
 #### 7. Relationship between percent chocolate and ratings
 
-```{r fig.height=30, fig.width=7}
+```{r fig.height=15, fig.width=10}
 chocolate_reviews_50 <- chocolate %>%
   group_by(country_of_bean_origin) %>%
   mutate(number_of_ratings = length(rating)) %>%
@@ -137,7 +137,8 @@ chocolate_reviews_50 <- chocolate %>%
 
 ggplot(data = chocolate_reviews_50) +
   geom_boxplot(aes( x = cocoa_percent_group, y = rating)) +
-  facet_grid(country_of_bean_origin ~ .) +
+  #facet_grid(country_of_bean_origin ~ .) +
+  facet_wrap(~ country_of_bean_origin, ncol = 4) +
   labs(title = "Rating vs. Cocoa Percentage by Country",
     x = "Percent Cocoa",
     y = "Rating")
